@@ -43,6 +43,22 @@ LDFLAGS="-buildid= -X sigs.k8s.io/release-utils/version.gitVersion=$(GIT_VERSION
         -X sigs.k8s.io/release-utils/version.buildDate=$(BUILD_DATE)"
 
 WITH_GOFLAGS = GOFLAGS="$(GOFLAGS)"
+
+# Standard OCI image labels/annotations; also overrides the source annotation inherited from distroless.
+IMAGE_SOURCE ?= https://github.com/kubernetes-sigs/kro
+oci_meta = --image-label 'org.opencontainers.image.$(1)=$(2)' --image-annotation 'org.opencontainers.image.$(1)=$(2)'
+KO_IMAGE_METADATA_FLAGS = \
+	$(call oci_meta,title,kro) \
+	$(call oci_meta,description,Kube Resource Orchestrator) \
+	$(call oci_meta,vendor,The Kubernetes Authors) \
+	$(call oci_meta,url,https://kro.run) \
+	$(call oci_meta,documentation,https://kro.run/docs/overview) \
+	$(call oci_meta,source,$(IMAGE_SOURCE)) \
+	$(call oci_meta,licenses,Apache-2.0) \
+	$(call oci_meta,revision,$(GIT_HASH)) \
+	$(call oci_meta,version,$(RELEASE_VERSION)) \
+	$(call oci_meta,created,$(BUILD_DATE))
+
 PPROF_GOFLAGS ?= -tags=pprof
 PPROF_IMAGE_TAG_SUFFIX ?= -debug
 
@@ -263,7 +279,7 @@ build-image: ko ## Build kro controller image.
 	$(WITH_GOFLAGS) KOCACHE=$(KOCACHE) KO_DOCKER_REPO=$(KO_DOCKER_REPO) \
 		$(KO) build --bare github.com/kubernetes-sigs/kro/cmd/controller \
 		$(if $(filter true,$(KO_LOCAL)),--local,--oci-layout-path rendered/oci/layout) \
-		--push=false --tags ${RELEASE_VERSION} --sbom=none
+		--push=false --tags ${RELEASE_VERSION} --sbom=none $(KO_IMAGE_METADATA_FLAGS)
 
 .PHONY: build-debug-image
 build-debug-image: ## Build kro controller debug image with pprof enabled.
@@ -273,7 +289,7 @@ build-debug-image: ## Build kro controller debug image with pprof enabled.
 publish-image: ko ## Publish kro controller image.
 	$(WITH_GOFLAGS) KOCACHE=$(KOCACHE) KO_DOCKER_REPO=$(KO_DOCKER_REPO) \
 		$(KO) publish --bare github.com/kubernetes-sigs/kro/cmd/controller \
-		--tags ${RELEASE_VERSION} --sbom=none
+		--tags ${RELEASE_VERSION} --sbom=none $(KO_IMAGE_METADATA_FLAGS)
 
 .PHONY: publish-debug-image
 publish-debug-image: ## Publish kro controller debug image with pprof enabled.
